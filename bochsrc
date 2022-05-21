@@ -1,0 +1,25 @@
+#µÚÒ»² ½ £¬Ê×ÏÈÉè ÖÃ Bochs ÔÚÔËÐ Ð ¹ ý³ ÌÖÐ ÄÜ¹ »Ê¹ ÓÃµÄÄÚ´ æ £¬±¾ ÀýÎª  32MB
+megs: 32
+
+#µÚ¶ þ ² ½ £¬Éè ÖÃ¶ ÔÓ¦Õæ Êµ»ú Æ ÷µÄ BIOS º Í VGA BIOS
+romimage: file=/home/liuzujing/bochs/share/bochs/BIOS-bochs-latest
+vgaromimage: file=/home/liuzujing/bochs/share/bochs/VGABIOS-lgpl-latest
+
+#µÚÈý² ½ £¬Éè ÖÃ Bochs Ëù Ê¹ ÓÃµÄ´ ÅÅÌ£¬Èí ÅÌµÄ¹ Ø ¼ ü ×ÖÎª  floppy¡ £
+#ÈôÖ»ÓÐ Ò»¸ öÈí ÅÌ£¬Ôò Ê¹ ÓÃ floppya ¼ ´ ¿ É£¬ÈôÓÐ ¶ à ¸ ö£¬Ôò Îª  floppya£¬floppyb¡ ­
+floppya: 1_44=a.img, status=inserted
+
+#µÚËÄ² ½ £¬Ñ¡ ÔñÆ ô¶ ¯ÅÌ·û
+#boot: floppy #Ä¬ÈÏ´ ÓÈí ÅÌÆ ô¶ ¯£¬½ «Æ ä×¢ÊÍ
+boot: floppy #¸ ÄÎª ´ ÓÓ² ÅÌÆ ô¶ ¯¡ £ÎÒÃÇµÄÈÎº Î´ ú Âë¶ ¼ ½ «Ö±½ ÓÐ ´ ÔÚÓ² ÅÌÉÏ£¬Ëù ÒÔ² »»á ÔÙÓÐ ¶ ÁÐ ´ Èí ÅÌµÄ² Ù×÷ 
+#µÚÎå² ½ £¬Éè ÖÃÈÕÖ¾ ÎÄ¼ þ µÄÊä³ ö
+log: bochsout.txt
+
+#µÚÁù ² ½ £¬¿ ª Æ ô»ò ¹ Ø ±ÕÄ³ Ð ©¹ ¦ÄÜ
+#ÏÂÃæ ÊÇ¹ Ø ±ÕÊó ±ê £¬² ¢´ ò ¿ ª ¼ ü ÅÌ
+mouse: enabled=0
+keyboard: keymap=/home/liuzujing/bochs/share/bochs/keymaps/x11-pc-us.map
+
+# Ó² ÅÌÉè ÖÃ
+ata0: enabled=1, ioaddr1=0x1f0, ioaddr2=0x3f0, irq=14
+# ata0-master: type=disk, path="hd60M.img", mode=flat
