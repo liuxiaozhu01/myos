@@ -20,14 +20,15 @@ ASMKFLAGS	= -I include/ -f elf
 CFLAGS		= -I include/ -c -fno-builtin
 LDFLAGS		= -s -Ttext $(ENTRYPOINT)
 DASMFLAGS	= -u -o $(ENTRYPOINT) -e $(ENTRYOFFSET)
-# 32 Architecture
-ELF32		= -m elf_i386
-M32		= -m32
+# 32 Architecture 
+# in 64 bit machine, the default executable/object file is 64 bit, which is incompatible 
+ELF32		= -m elf_i386		# ld: output 32 bit executable file
+M32		= -m32					# gcc output 32 bit object file
 
 # This Program
 ORANGESBOOT	= boot/boot.bin boot/loader.bin
 ORANGESKERNEL	= kernel.bin
-OBJS		= kernel/kernel.o kernel/start.o lib/kliba.o lib/string.o
+OBJS		= kernel/kernel.o kernel/start.o kernel/i8259.o kernel/global.o kernel/protect.o lib/kliba.o lib/klib.o lib/string.o
 DASMOUTPUT	= kernel.bin.asm
 
 # All Phony Targets
@@ -72,8 +73,23 @@ $(ORANGESKERNEL) : $(OBJS)
 kernel/kernel.o : kernel/kernel.asm
 	$(ASM) $(ASMKFLAGS) -o $@ $<
 
-kernel/start.o : kernel/start.c include/type.h include/const.h include/protect.h
+kernel/start.o: kernel/start.c include/type.h include/const.h include/protect.h \
+			include/proto.h include/string.h
 	$(CC) $(M32) $(CFLAGS) -o $@ $<
+
+kernel/i8259.o : kernel/i8259.c include/type.h include/const.h include/protect.h \
+			include/proto.h
+	$(CC) $(M32) $(CFLAGS) -o $@ $<
+
+kernel/global.o : kernel/global.c
+	$(CC) $(M32) $(CFLAGS) -o $@ $<
+
+# $(CFLAGS)后面加上-fno-stack-protector，即不需要栈保护
+kernel/protect.o : kernel/protect.c
+	$(CC) $(M32) $(CFLAGS) -fno-stack-protector -o $@ $<
+
+lib/klib.o : lib/klib.c
+	$(CC) $(M32) $(CFLAGS) -fno-stack-protector -o $@ $<
 
 lib/kliba.o : lib/kliba.asm
 	$(ASM) $(ASMKFLAGS) -o $@ $<
