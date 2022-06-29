@@ -8,12 +8,15 @@
 #include "type.h"
 #include "const.h"
 #include "protect.h"
-#include "global.h"
 #include "proto.h"
+#include "proc.h"
+#include "global.h"
+
 
 /* 本文件内的函数声明 */
-PRIVATE void init_idt_desc(unsigned char vector, u8 desc_type, 
-                int_handler handler, unsigned char privilege);
+PRIVATE void init_idt_desc(unsigned char vector, u8 desc_type, int_handler handler, unsigned char privilege);
+PRIVATE void init_descriptor(DESCRIPTOR * p_desc, u32 base, u32 limit, u16 attribute);
+
 
 /* 中断处理函数 */
 void	divide_error();
@@ -54,7 +57,7 @@ void    hwint15();
  *======================================================================*/
 PUBLIC void init_prot()
 {
-    	init_8259A();
+    init_8259A();
 
 	// 全部初始化成中断门(没有陷阱门)
 	init_idt_desc(INT_VECTOR_DIVIDE,	DA_386IGate,
@@ -152,6 +155,19 @@ PUBLIC void init_prot()
 
         init_idt_desc(INT_VECTOR_IRQ8 + 7,      DA_386IGate,
                       hwint15,                  PRIVILEGE_KRNL);
+
+	memset(&tss, 0, sizeof(tss));
+	tss.ss0 = SELECTOR_KERNEL_DS;
+	init_descriptor(&gdt[INDEX_TSS], 
+			vir2phys(seg2phy(SELECTOR_KERNEL_DS), &tss),
+			sizeof(tss) - 1,
+			DA_386TSS);
+	
+	// 填充GDT中进程的LDT描述符
+	init_descriptor(&gdt[INDEX_LDT_FIRST],
+				vir2phys(seg2phy(SELECTOR_KERNEL_DS), proc_table[0].ldts),
+				LDT_SIZE * sizeof(DESCRIPTOR) - 1,
+				DA_LDT);
 }
 
 /*======================================================================*
@@ -169,6 +185,33 @@ PRIVATE void init_idt_desc(unsigned char vector, u8 desc_type,
     p_gate->dcount = 0;
     p_gate->attr = desc_type | (privilege << 5);
     p_gate->offset_high = (base >> 16) & 0xFFFF;
+}
+
+/*======================================================================*
+                           seg2phys
+ *----------------------------------------------------------------------*
+ 由段名求绝对地址 --- 参数是段描述法
+ *======================================================================*/
+PUBLIC u32 seg2phy(u16 seg)
+{
+	DESCRIPTOR* p_dest = &gdt[seg >> 3];
+
+	return (p_dest->base_high << 24) | (p_dest->base_mid << 16) | (p_dest->base_low);
+}
+
+/*======================================================================*
+                           init_descriptor
+ *----------------------------------------------------------------------*
+ 初始化段描述符
+ *======================================================================*/
+PRIVATE void init_descriptor(DESCRIPTOR* p_desc, u32 base, u32 limit, u16 attribute)
+{
+	p_desc->limit_low		= limit & 0x0FFFF;		// 段界限 1		(2 字节)
+	p_desc->base_low		= base & 0x0FFFF;		// 段基址 1		(2 字节)
+	p_desc->base_mid		= (base >> 16) & 0x0FF;		// 段基址 2		(1 字节)
+	p_desc->attr1			= attribute & 0xFF;		// 属性 1
+	p_desc->limit_high_attr2	= ((limit >> 16) & 0x0F) | (attribute >> 8) & 0xF0;// 段界限 2 + 属性 2
+	p_desc->base_high		= (base >> 24) & 0x0FF;		// 段基址 3		(1 字节)
 }
 
 /*======================================================================*

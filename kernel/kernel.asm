@@ -6,17 +6,27 @@
 ; ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
 
-SELECTOR_KERNEL_CS	equ	8
+%include "sconst.inc"
 
 ; 导入函数
 extern	cstart
-extern exception_handler
-extern spurious_irq
+extern  kernel_main
+extern  exception_handler
+extern  spurious_irq
+extern  disp_str
+extern  delay
 
 ; 导入全局变量
 extern	gdt_ptr
-extern idt_ptr
-extern disp_pos
+extern	idt_ptr
+extern	p_proc_ready
+extern	tss
+extern	disp_pos
+extern	k_reenter
+
+bits 32
+[SECTION .data]
+clock_int_msg		db	"^", 0
 
 
 [SECTION .bss]
@@ -26,6 +36,8 @@ StackTop:		; 栈顶
 [section .text]	; 代码在此
 
 global _start	; 导出 _start
+
+global restart
 
 global	divide_error
 global	single_step_exception
@@ -115,8 +127,13 @@ _start:
 
 	jmp	SELECTOR_KERNEL_CS:csinit
 csinit:		; “这个跳转指令强制使用刚刚初始化的结构”——<<OS:D&I 2nd>> P90.
-	sti		; 设置IF位，打开外部中断
-	hlt		; 暂停指令
+	; sti		; 设置IF位，打开外部中断
+	; hlt		; 暂停指令
+	xor eax, eax
+	mov ax, SELECTOR_TSS
+	ltr ax
+
+	jmp kernel_main
 
 
 ; 中断和异常 -- 硬件中断
@@ -135,7 +152,53 @@ hwint00:                ; Interrupt routine for irq 0 (the clock).
 
 ALIGN   16
 hwint01:                ; Interrupt routine for irq 1 (keyboard)
-        hwint_master    1
+	sub	esp, 4	; 中断发生时,esp的值是从TSS里面渠道的进程表中regs的最高地址
+	pushad		; `.
+	push	ds	;  |
+	push	es	;  | 保存原寄存器值
+	push	fs	;  |
+	push	gs	; /
+	mov	dx, ss
+	mov	ds, dx
+	mov	es, dx
+
+	inc byte [gs:0]		; 改变屏幕第 0 行, 第 0 列的字符
+
+	mov al, EOI			; reenable
+	out INT_M_CTL, al	; master 8259
+
+	inc	dword [k_reenter]
+	cmp	dword [k_reenter], 0
+	jne	.re_enter
+	
+	mov	esp, StackTop		; 切换到内核栈
+
+	sti						; 开中断
+
+	push	clock_int_msg
+	call	disp_str
+	add	esp, 4
+
+;;; 	push	1
+;;; 	call	delay
+;;; 	add	esp, 4
+
+	cli						; 关中断
+
+	mov	esp, [p_proc_ready]	; 离开内核栈，又回到了进程表里，esp指向regs的最低地址处
+
+	lea	eax, [esp + P_STACKTOP]		; 又在设置tss.esp0的值
+	mov	dword [tss + TSS3_S_SP0], eax	
+.re_enter:	; 如果(k_reenter != 0)，会跳转到这里
+	dec	dword [k_reenter]
+	pop	gs	; `.
+	pop	fs	;  |
+	pop	es	;  | 恢复原寄存器值
+	pop	ds	;  |
+	popad		; /
+	add	esp, 4
+
+	iretd	; 进程自己的栈的指针也放在进程表的regs里，iretd把这个进程自己的栈指针值弹出到esp中。还有其他的eip, cs, eflags, ss
 
 ALIGN   16
 hwint02:                ; Interrupt routine for irq 2 (cascade!)
@@ -268,3 +331,21 @@ exception:
 	call	exception_handler
 	add	esp, 4*2	; 让栈顶指向 EIP，堆栈中从顶向下依次是：EIP、CS、EFLAGS
 	hlt
+
+; ====================================================================================
+;                                   restart
+; ====================================================================================
+restart:
+	mov	esp, [p_proc_ready]
+	lldt	[esp + P_LDT_SEL]
+	lea	eax, [esp + P_STACKTOP]				; 中断发生时，从ring1 -> ring0，需要借助tss，esp的值要从TSS里取到的进程表中regs的最高地址
+	mov dword [tss + TSS3_S_SP0], eax		; 这里就是把进程表regs中的最高地址放到tss->esp0中
+	pop gs
+	pop fs
+	pop es
+	pop ds
+	popad
+	add esp, 4
+	iretd		; 进程自己的栈的指针也放在进程表的regs里，iretd把这个进程自己的栈指针值弹出到esp中。还有其他的eip, cs, eflags, ss
+
+	
