@@ -1,5 +1,6 @@
 {
     "files.associations": {
         "proto.h": "c"
-    }
+    },
+    "C_Cpp.errorSquiggles": "Disabled"
 }

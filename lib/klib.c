@@ -34,7 +34,7 @@ PUBLIC char * itoa(char * str, int num)
 		for(i=28;i>=0;i-=4){
 			ch = (num >> i) & 0xF;
 			if(flag || (ch > 0)){
-				flag = 1;
+				flag = TRUE;
 				ch += '0';
 				if(ch > '9'){
 					ch += 7;

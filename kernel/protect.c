@@ -1,5 +1,7 @@
 
-
+/*++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+                              protect.c
+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++*/
 
 
 
@@ -159,13 +161,14 @@ PUBLIC void init_prot()
 	memset(&tss, 0, sizeof(tss));
 	tss.ss0 = SELECTOR_KERNEL_DS;
 	init_descriptor(&gdt[INDEX_TSS], 
-			vir2phys(seg2phy(SELECTOR_KERNEL_DS), &tss),
+			vir2phys(seg2phys(SELECTOR_KERNEL_DS), &tss),
 			sizeof(tss) - 1,
 			DA_386TSS);
+	tss.iobase	= sizeof(tss);	/* 没有I/O许可位图 */		
 	
 	// 填充GDT中进程的LDT描述符
 	init_descriptor(&gdt[INDEX_LDT_FIRST],
-				vir2phys(seg2phy(SELECTOR_KERNEL_DS), proc_table[0].ldts),
+				vir2phys(seg2phys(SELECTOR_KERNEL_DS), proc_table[0].ldts),
 				LDT_SIZE * sizeof(DESCRIPTOR) - 1,
 				DA_LDT);
 }
@@ -175,8 +178,7 @@ PUBLIC void init_prot()
  *----------------------------------------------------------------------*
  初始化 386 中断门
  *======================================================================*/
-PRIVATE void init_idt_desc(unsigned char vector, u8 desc_type, 
-                int_handler handler, unsigned char privilege)
+PUBLIC void init_idt_desc(unsigned char vector, u8 desc_type, int_handler handler, unsigned char privilege)
 {
     GATE * p_gate = &idt[vector];
     u32 base = (u32)handler;
@@ -190,9 +192,9 @@ PRIVATE void init_idt_desc(unsigned char vector, u8 desc_type,
 /*======================================================================*
                            seg2phys
  *----------------------------------------------------------------------*
- 由段名求绝对地址 --- 参数是段描述法
+ 由段名求绝对地址 --- 参数是段描述符
  *======================================================================*/
-PUBLIC u32 seg2phy(u16 seg)
+PUBLIC u32 seg2phys(u16 seg)
 {
 	DESCRIPTOR* p_dest = &gdt[seg >> 3];
 
@@ -219,12 +221,11 @@ PRIVATE void init_descriptor(DESCRIPTOR* p_desc, u32 base, u32 limit, u16 attrib
  *----------------------------------------------------------------------*
  异常处理
  *======================================================================*/
-PUBLIC void exception_handler(int vec_no,int err_code,int eip,int cs,int eflags)
+PUBLIC void exception_handler(int vec_no, int err_code, int eip, int cs, int eflags)
 {
 	int i;
 	int text_color = 0x74; /* 灰底红字 */
-
-	char * err_msg[] = {"#DE Divide Error",
+	char err_description[][64] = {	"#DE Divide Error",
 			    "#DB RESERVED",
 			    "—  NMI Interrupt",
 			    "#BP Breakpoint",
@@ -254,7 +255,7 @@ PUBLIC void exception_handler(int vec_no,int err_code,int eip,int cs,int eflags)
 	disp_pos = 0;
 
 	disp_color_str("Exception! --> ", text_color);
-	disp_color_str(err_msg[vec_no], text_color);
+	disp_color_str(err_description[vec_no], text_color);
 	disp_color_str("\n\n", text_color);
 	disp_color_str("EFLAGS:", text_color);
 	disp_int(eflags);

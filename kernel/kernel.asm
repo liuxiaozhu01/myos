@@ -146,12 +146,9 @@ csinit:		; “这个跳转指令强制使用刚刚初始化的结构”——<<O
 %endmacro
 ; ---------------------------------
 
-ALIGN   16
-hwint00:                ; Interrupt routine for irq 0 (the clock).
-        hwint_master    0
 
 ALIGN   16
-hwint01:                ; Interrupt routine for irq 1 (keyboard)
+hwint00:                ; Interrupt routine for irq 1 (keyboard)
 	sub	esp, 4	; 中断发生时,esp的值是从TSS里面渠道的进程表中regs的最高地址
 	pushad		; `.
 	push	ds	;  |
@@ -199,6 +196,10 @@ hwint01:                ; Interrupt routine for irq 1 (keyboard)
 	add	esp, 4
 
 	iretd	; 进程自己的栈的指针也放在进程表的regs里，iretd把这个进程自己的栈指针值弹出到esp中。还有其他的eip, cs, eflags, ss
+
+ALIGN	16
+hwint01:		; Interrupt routine for irq 1 (keyboard)
+	hwint_master	1
 
 ALIGN   16
 hwint02:                ; Interrupt routine for irq 2 (cascade!)

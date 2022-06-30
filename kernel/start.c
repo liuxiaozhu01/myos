@@ -41,5 +41,5 @@ PUBLIC void cstart()
 	/* init_prot()定义在protect.c文件中，作用是初始化中断向量表 */
 	init_prot();
 	
-	disp_str("-----\"cstart\" ends-----\n");
+	disp_str("-----\"cstart\" finished-----\n");
 }

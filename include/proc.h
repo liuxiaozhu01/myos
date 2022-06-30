@@ -1,30 +1,32 @@
 
+/*++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+                               proc.h
+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++ */
 
 
 
 
 
 
-
-typedef struct s_stackframe {	/* proc_ptr points here				â†‘ Low			*/
-	u32	gs;		                /* â”“						â”‚			*/
-	u32	fs;		                /* â”ƒ						â”‚			*/
-	u32	es;		                /* â”ƒ						â”‚			*/
-	u32	ds;		                /* â”ƒ						â”‚			*/
-	u32	edi;		            /* â”ƒ						â”‚			*/
-	u32	esi;		            /* â”£ pushed by save()		â”‚			*/
-	u32	ebp;		            /* â”ƒ						â”‚			*/
-	u32	kernel_esp;	            /* <- 'popad' will ignore itâ”‚			*/
-	u32	ebx;		            /* â”ƒ				â†‘æ ˆä»Žé«˜åœ°å€å¾€ä½Žåœ°å€å¢žé•¿*/		
-	u32	edx;		            /* â”ƒ						â”‚			*/
-	u32	ecx;		            /* â”ƒ						â”‚			*/
-	u32	eax;		            /* â”›						â”‚			*/
-	u32	retaddr;	            /* return address for assembly code save()	â”‚			*/
-	u32	eip;		            /*  â”“						â”‚			*/
-	u32	cs;		                /*  â”ƒ						â”‚			*/
-	u32	eflags;		            /*  â”£ these are pushed by CPU during interrupt	â”‚			*/
-	u32	esp;		            /*  â”ƒ						â”‚			*/
-	u32	ss;		                /*  â”›						â”·High			*/
+typedef struct s_stackframe {	/* proc_ptr points here				â†? Low			*/
+	u32	gs;		                /* â”?						â”?			*/
+	u32	fs;		                /* â”?						â”?			*/
+	u32	es;		                /* â”?						â”?			*/
+	u32	ds;		                /* â”?						â”?			*/
+	u32	edi;		            /* â”?						â”?			*/
+	u32	esi;		            /* â”? pushed by save()		â”?			*/
+	u32	ebp;		            /* â”?						â”?			*/
+	u32	kernel_esp;	            /* <- 'popad' will ignore itâ”?			*/
+	u32	ebx;		            /* â”?				â†‘æ ˆä»Žé«˜åœ°å€å¾€ä½Žåœ°å€å¢žé•¿*/		
+	u32	edx;		            /* â”?						â”?			*/
+	u32	ecx;		            /* â”?						â”?			*/
+	u32	eax;		            /* â”?						â”?			*/
+	u32	retaddr;	            /* return address for assembly code save()	â”?			*/
+	u32	eip;		            /*  â”?						â”?			*/
+	u32	cs;		                /*  â”?						â”?			*/
+	u32	eflags;		            /*  â”? these are pushed by CPU during interrupt	â”?			*/
+	u32	esp;		            /*  â”?						â”?			*/
+	u32	ss;		                /*  â”?						â”·High			*/
 }STACK_FRAME;
 
 

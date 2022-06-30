@@ -15,7 +15,7 @@ EXTERN	DESCRIPTOR	gdt[GDT_SIZE];
 EXTERN	u8		idt_ptr[6];	/* 0~15:Limit  16~47:Base */
 EXTERN	GATE		idt[IDT_SIZE];
 
-EXTERN  u32      k_reenter;       /* 初值为-1，中断处理程序开始执行时自增，结束时自减。非0则说明在一次中断未处理完之前又发生了一次中断 */
+EXTERN  u32      k_reenter;       /* 初值为-1，中�?处理程序开始执行时�?增，结束时自减。非0则�?�明在一次中�?�?处理完之前又发生了一次中�? */
 
 EXTERN  TSS      tss;
 EXTERN  PROCESS* p_proc_ready;

@@ -16,7 +16,11 @@
 #define	PUBLIC		/* PUBLIC is the opposite of PRIVATE */
 #define	PRIVATE	static	/* PRIVATE x limits the scope of x */
 
-/* GDT 和 IDT 中描述符的个数 */
+/* Boolean */
+#define	TRUE	1
+#define	FALSE	0
+
+/* GDT �? IDT �?描述符的�?�? */
 #define	GDT_SIZE	128
 #define IDT_SIZE    256
 
