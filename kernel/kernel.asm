@@ -10,11 +10,13 @@
 
 ; 导入函数
 extern	cstart
-extern  kernel_main
-extern  exception_handler
-extern  spurious_irq
-extern  disp_str
-extern  delay
+extern	kernel_main
+extern	exception_handler
+extern	spurious_irq
+extern	clock_handler
+extern	disp_str
+extern	delay
+extern	irq_table
 
 ; 导入全局变量
 extern	gdt_ptr
@@ -25,9 +27,9 @@ extern	disp_pos
 extern	k_reenter
 
 bits 32
+
 [SECTION .data]
 clock_int_msg		db	"^", 0
-
 
 [SECTION .bss]
 StackSpace		resb	2 * 1024
@@ -55,22 +57,23 @@ global	stack_exception
 global	general_protection
 global	page_fault
 global	copr_error
-global  hwint00
-global  hwint01
-global  hwint02
-global  hwint03
-global  hwint04
-global  hwint05
-global  hwint06
-global  hwint07
-global  hwint08
-global  hwint09
-global  hwint10
-global  hwint11
-global  hwint12
-global  hwint13
-global  hwint14
-global  hwint15
+global	hwint00
+global	hwint01
+global	hwint02
+global	hwint03
+global	hwint04
+global	hwint05
+global	hwint06
+global	hwint07
+global	hwint08
+global	hwint09
+global	hwint10
+global	hwint11
+global	hwint12
+global	hwint13
+global	hwint14
+global	hwint15
+
 
 _start:
 	; 此时内存看上去是这样的（更详细的内存情况在 LOADER.ASM 中有说明）：
@@ -116,8 +119,8 @@ _start:
 
 	; 把 esp 从 LOADER 挪到 KERNEL
 	mov	esp, StackTop	; 堆栈在 bss 段中
-	
-	mov dword [disp_pos], 0
+
+	mov	dword [disp_pos], 0
 
 	sgdt	[gdt_ptr]	; cstart() 中将会用到 gdt_ptr
 	call	cstart		; 在此函数中改变了gdt_ptr，让它指向新的GDT
@@ -127,144 +130,114 @@ _start:
 
 	jmp	SELECTOR_KERNEL_CS:csinit
 csinit:		; “这个跳转指令强制使用刚刚初始化的结构”——<<OS:D&I 2nd>> P90.
-	; sti		; 设置IF位，打开外部中断
-	; hlt		; 暂停指令
-	xor eax, eax
-	mov ax, SELECTOR_TSS
-	ltr ax
 
-	jmp kernel_main
+	;jmp 0x40:0
+	;ud2
+
+
+	xor	eax, eax
+	mov	ax, SELECTOR_TSS
+	ltr	ax
+
+	;sti
+	jmp	kernel_main
+
+	;hlt
 
 
 ; 中断和异常 -- 硬件中断
 ; ---------------------------------
-%macro  hwint_master    1
-        push    %1
-        call    spurious_irq
-        add     esp, 4
-        hlt
+%macro	hwint_master	1
+	call	save
+	in	al, INT_M_CTLMASK	; `.
+	or	al, (1 << %1)		;  | 屏蔽当前中断
+	out	INT_M_CTLMASK, al	; /
+	mov	al, EOI			; `. 置EOI位
+	out	INT_M_CTL, al		; /
+	sti	; CPU在响应中断的过程中会自动关中断，这句之后就允许响应新的中断
+	push	%1			; `.
+	call	[irq_table + 4 * %1]	;  | 中断处理程序
+	pop	ecx			; /
+	cli
+	in	al, INT_M_CTLMASK	; `.
+	and	al, ~(1 << %1)		;  | 恢复接受当前中断
+	out	INT_M_CTLMASK, al	; /
+	ret
 %endmacro
-; ---------------------------------
 
 
-ALIGN   16
-hwint00:                ; Interrupt routine for irq 1 (keyboard)
-	sub	esp, 4	; 中断发生时,esp的值是从TSS里面渠道的进程表中regs的最高地址
-	pushad		; `.
-	push	ds	;  |
-	push	es	;  | 保存原寄存器值
-	push	fs	;  |
-	push	gs	; /
-	mov	dx, ss
-	mov	ds, dx
-	mov	es, dx
-
-	inc byte [gs:0]		; 改变屏幕第 0 行, 第 0 列的字符
-
-	mov al, EOI			; reenable
-	out INT_M_CTL, al	; master 8259
-
-	inc	dword [k_reenter]
-	cmp	dword [k_reenter], 0
-	jne	.re_enter
-	
-	mov	esp, StackTop		; 切换到内核栈
-
-	sti						; 开中断
-
-	push	clock_int_msg
-	call	disp_str
-	add	esp, 4
-
-;;; 	push	1
-;;; 	call	delay
-;;; 	add	esp, 4
-
-	cli						; 关中断
-
-	mov	esp, [p_proc_ready]	; 离开内核栈，又回到了进程表里，esp指向regs的最低地址处
-
-	lea	eax, [esp + P_STACKTOP]		; 又在设置tss.esp0的值
-	mov	dword [tss + TSS3_S_SP0], eax	
-.re_enter:	; 如果(k_reenter != 0)，会跳转到这里
-	dec	dword [k_reenter]
-	pop	gs	; `.
-	pop	fs	;  |
-	pop	es	;  | 恢复原寄存器值
-	pop	ds	;  |
-	popad		; /
-	add	esp, 4
-
-	iretd	; 进程自己的栈的指针也放在进程表的regs里，iretd把这个进程自己的栈指针值弹出到esp中。还有其他的eip, cs, eflags, ss
+ALIGN	16
+hwint00:		; Interrupt routine for irq 0 (the clock).
+	hwint_master	0
 
 ALIGN	16
 hwint01:		; Interrupt routine for irq 1 (keyboard)
 	hwint_master	1
 
-ALIGN   16
-hwint02:                ; Interrupt routine for irq 2 (cascade!)
-        hwint_master    2
+ALIGN	16
+hwint02:		; Interrupt routine for irq 2 (cascade!)
+	hwint_master	2
 
-ALIGN   16
-hwint03:                ; Interrupt routine for irq 3 (second serial)
-        hwint_master    3
+ALIGN	16
+hwint03:		; Interrupt routine for irq 3 (second serial)
+	hwint_master	3
 
-ALIGN   16
-hwint04:                ; Interrupt routine for irq 4 (first serial)
-        hwint_master    4
+ALIGN	16
+hwint04:		; Interrupt routine for irq 4 (first serial)
+	hwint_master	4
 
-ALIGN   16
-hwint05:                ; Interrupt routine for irq 5 (XT winchester)
-        hwint_master    5
+ALIGN	16
+hwint05:		; Interrupt routine for irq 5 (XT winchester)
+	hwint_master	5
 
-ALIGN   16
-hwint06:                ; Interrupt routine for irq 6 (floppy)
-        hwint_master    6
+ALIGN	16
+hwint06:		; Interrupt routine for irq 6 (floppy)
+	hwint_master	6
 
-ALIGN   16
-hwint07:                ; Interrupt routine for irq 7 (printer)
-        hwint_master    7
+ALIGN	16
+hwint07:		; Interrupt routine for irq 7 (printer)
+	hwint_master	7
 
 ; ---------------------------------
-%macro  hwint_slave     1
-        push    %1
-        call    spurious_irq
-        add     esp, 4
-        hlt
+%macro	hwint_slave	1
+	push	%1
+	call	spurious_irq
+	add	esp, 4
+	hlt
 %endmacro
 ; ---------------------------------
 
-ALIGN   16
-hwint08:                ; Interrupt routine for irq 8 (realtime clock).
-        hwint_slave     8
+ALIGN	16
+hwint08:		; Interrupt routine for irq 8 (realtime clock).
+	hwint_slave	8
 
-ALIGN   16
-hwint09:                ; Interrupt routine for irq 9 (irq 2 redirected)
-        hwint_slave     9
+ALIGN	16
+hwint09:		; Interrupt routine for irq 9 (irq 2 redirected)
+	hwint_slave	9
 
-ALIGN   16
-hwint10:                ; Interrupt routine for irq 10
-        hwint_slave     10
+ALIGN	16
+hwint10:		; Interrupt routine for irq 10
+	hwint_slave	10
 
-ALIGN   16
-hwint11:                ; Interrupt routine for irq 11
-        hwint_slave     11
+ALIGN	16
+hwint11:		; Interrupt routine for irq 11
+	hwint_slave	11
 
-ALIGN   16
-hwint12:                ; Interrupt routine for irq 12
-        hwint_slave     12
+ALIGN	16
+hwint12:		; Interrupt routine for irq 12
+	hwint_slave	12
 
-ALIGN   16
-hwint13:                ; Interrupt routine for irq 13 (FPU exception)
-        hwint_slave     13
+ALIGN	16
+hwint13:		; Interrupt routine for irq 13 (FPU exception)
+	hwint_slave	13
 
-ALIGN   16
-hwint14:                ; Interrupt routine for irq 14 (AT winchester)
-        hwint_slave     14
+ALIGN	16
+hwint14:		; Interrupt routine for irq 14 (AT winchester)
+	hwint_slave	14
 
-ALIGN   16
-hwint15:                ; Interrupt routine for irq 15
-        hwint_slave     15
+ALIGN	16
+hwint15:		; Interrupt routine for irq 15
+	hwint_slave	15
 
 
 
@@ -334,19 +307,46 @@ exception:
 	hlt
 
 ; ====================================================================================
+;                                   save
+; ====================================================================================
+save:
+        pushad          ; `.
+        push    ds      ;  |
+        push    es      ;  | 保存原寄存器值
+        push    fs      ;  |
+        push    gs      ; /
+        mov     dx, ss
+        mov     ds, dx
+        mov     es, dx
+
+        mov     eax, esp                    ;eax = 进程表起始地址
+
+        inc     dword [k_reenter]           ;k_reenter++;
+        cmp     dword [k_reenter], 0        ;if(k_reenter ==0)
+        jne     .1                          ;{
+        mov     esp, StackTop               ;  mov esp, StackTop <--切换到内核栈
+        push    restart                     ;  push restart
+        jmp     [eax + RETADR - P_STACKBASE];  return;
+.1:                                         ;} else { 已经在内核栈，不需要再切换
+        push    restart_reenter             ;  push restart_reenter
+        jmp     [eax + RETADR - P_STACKBASE];  return;
+                                            ;}
+
+; ====================================================================================
 ;                                   restart
 ; ====================================================================================
 restart:
 	mov	esp, [p_proc_ready]
-	lldt	[esp + P_LDT_SEL]
-	lea	eax, [esp + P_STACKTOP]				; 中断发生时，从ring1 -> ring0，需要借助tss，esp的值要从TSS里取到的进程表中regs的最高地址
-	mov dword [tss + TSS3_S_SP0], eax		; 这里就是把进程表regs中的最高地址放到tss->esp0中
-	pop gs
-	pop fs
-	pop es
-	pop ds
+	lldt	[esp + P_LDT_SEL] 
+	lea	eax, [esp + P_STACKTOP]
+	mov	dword [tss + TSS3_S_SP0], eax
+restart_reenter:
+	dec	dword [k_reenter]
+	pop	gs
+	pop	fs
+	pop	es
+	pop	ds
 	popad
-	add esp, 4
-	iretd		; 进程自己的栈的指针也放在进程表的regs里，iretd把这个进程自己的栈指针值弹出到esp中。还有其他的eip, cs, eflags, ss
+	add	esp, 4
+	iretd
 
-	

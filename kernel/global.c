@@ -1,6 +1,9 @@
+
 /*++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
                             global.c
-++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++*/
+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+                                                    Forrest Yu, 2005
+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++*/
 
 #define GLOBAL_VARIABLES_HERE
 
@@ -12,7 +15,12 @@
 #include "global.h"
 
 
-PUBLIC PROCESS proc_table[NR_TASKS];
+PUBLIC	PROCESS			proc_table[NR_TASKS];
 
-PUBLIC char task_stack[STACK_SIZE_TOTAL]
+PUBLIC	char			task_stack[STACK_SIZE_TOTAL];
 
+PUBLIC	TASK	task_table[NR_TASKS] = {{TestA, STACK_SIZE_TESTA, "TestA"},
+					{TestB, STACK_SIZE_TESTB, "TestB"},
+					{TestC, STACK_SIZE_TESTC, "TestC"}};
+
+PUBLIC	irq_handler		irq_table[NR_IRQ];
