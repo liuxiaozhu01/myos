@@ -1,6 +1,6 @@
 
 /*++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
-                               clock.c
+                               proc.c
 ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
                                                     Forrest Yu, 2005
 ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++*/
@@ -13,35 +13,35 @@
 #include "proc.h"
 #include "global.h"
 
-
 /*======================================================================*
-                           clock_handler
+                              schedule
  *======================================================================*/
-PUBLIC void clock_handler(int irq)
+PUBLIC void schedule()
 {
-	ticks++;
-	p_proc_ready->ticks--;
+	PROCESS* p;
+	int	 greatest_ticks = 0;
 
-	if (k_reenter != 0) {
-		return;
+	while (!greatest_ticks) {
+		for (p = proc_table; p < proc_table+NR_TASKS; p++) {
+			if (p->ticks > greatest_ticks) {
+				greatest_ticks = p->ticks;
+				p_proc_ready = p;
+			}
+		}
+
+		if (!greatest_ticks) {
+			for (p = proc_table; p < proc_table+NR_TASKS; p++) {
+				p->ticks = p->priority;
+			}
+		}
 	}
-
-	/* 每个进程自己的时间片结束了才能调度到另一进程 */
-	if (p_proc_ready->ticks > 0) {
-		return;
-	}
-
-	schedule();
-
 }
 
 /*======================================================================*
-                              milli_delay
+                           sys_get_ticks
  *======================================================================*/
-PUBLIC void milli_delay(int milli_sec)
+PUBLIC int sys_get_ticks()
 {
-        int t = get_ticks();
-
-        while(((get_ticks() - t) * 1000 / HZ) < milli_sec) {}
+	return ticks;
 }
 

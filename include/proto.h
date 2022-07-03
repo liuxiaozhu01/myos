@@ -33,3 +33,13 @@ PUBLIC void spurious_irq(int irq);
 /* clock.c */
 PUBLIC void clock_handler(int irq);
 
+
+/* 以下是系统调用相关 */
+
+/* proc.c */
+PUBLIC  int     sys_get_ticks();        /* sys_call */
+
+/* syscall.asm */
+PUBLIC  void    sys_call();             /* int_handler */
+PUBLIC  int     get_ticks();
+

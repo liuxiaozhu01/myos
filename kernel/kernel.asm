@@ -25,6 +25,7 @@ extern	p_proc_ready
 extern	tss
 extern	disp_pos
 extern	k_reenter
+extern	sys_call_table
 
 bits 32
 
@@ -40,6 +41,7 @@ StackTop:		; 栈顶
 global _start	; 导出 _start
 
 global restart
+global sys_call
 
 global	divide_error
 global	single_step_exception
@@ -319,25 +321,42 @@ save:
         mov     ds, dx
         mov     es, dx
 
-        mov     eax, esp                    ;eax = 进程表起始地址
+        mov     esi, esp                    ;esi = 进程表起始地址
 
         inc     dword [k_reenter]           ;k_reenter++;
         cmp     dword [k_reenter], 0        ;if(k_reenter ==0)
         jne     .1                          ;{
         mov     esp, StackTop               ;  mov esp, StackTop <--切换到内核栈
         push    restart                     ;  push restart
-        jmp     [eax + RETADR - P_STACKBASE];  return;
+        jmp     [esi + RETADR - P_STACKBASE];  return;
 .1:                                         ;} else { 已经在内核栈，不需要再切换
         push    restart_reenter             ;  push restart_reenter
-        jmp     [eax + RETADR - P_STACKBASE];  return;
+        jmp     [esi + RETADR - P_STACKBASE];  return;
                                             ;}
 
+
 ; ====================================================================================
-;                                   restart
+;                                 sys_call
+; ====================================================================================
+sys_call:
+        call    save
+
+        sti
+
+        call    [sys_call_table + eax * 4]
+        mov     [esi + EAXREG - P_STACKBASE], eax
+
+        cli
+
+        ret
+
+
+; ====================================================================================
+;				    restart
 ; ====================================================================================
 restart:
 	mov	esp, [p_proc_ready]
-	lldt	[esp + P_LDT_SEL] 
+	lldt	[esp + P_LDT_SEL]
 	lea	eax, [esp + P_STACKTOP]
 	mov	dword [tss + TSS3_S_SP0], eax
 restart_reenter:

@@ -32,8 +32,9 @@ PUBLIC void init_8259A()
 	out_byte(INT_S_CTLMASK,	0xFF);	// Slave  8259, OCW1.
 
 	int i;
-	for (i = 0; i < NR_IRQ; i++)
+	for (i = 0; i < NR_IRQ; i++) {
 		irq_table[i] = spurious_irq;
+	}
 }
 
 /*======================================================================*
